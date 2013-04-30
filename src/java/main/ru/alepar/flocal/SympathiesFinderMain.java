@@ -1,15 +1,27 @@
 package ru.alepar.flocal;
 
+import com.google.common.base.Function;
+import com.google.common.base.Predicate;
+import com.google.common.collect.FluentIterable;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.alepar.flocal.http.FlocalClient;
 import ru.alepar.flocal.users.*;
 
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static ru.alepar.flocal.MoreGuava.notNull;
 
 public class SympathiesFinderMain {
 
@@ -18,39 +30,35 @@ public class SympathiesFinderMain {
     public static void main(String[] args) throws Exception {
         log.info("started");
 
-        final ExecutorService executor = Executors.newFixedThreadPool(200);
-        final List<Future<List<User>>> userFutures = Lists.newArrayList();
+        final ListeningExecutorService executor = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(200));
+
+        final List<Future<List<UserInfo>>> infoFutures = Lists.newArrayList();
         for (int i=1; i<=900; i++) {
-            userFutures.add(executor.submit(new UserListPageTask(i)));
+            infoFutures.add(
+                    Futures.transform(
+                            executor.submit(new UserListPageTask(i)),
+                            new UserInfoFunction()
+                    ));
+
         }
 
-        final List<Future<UserInfo>> infoFutures = Lists.newArrayList();
-        for (Future<List<User>> future : userFutures) {
-            try {
-                final List<User> sublist = future.get();
-                for (User user : sublist) {
-                    if (user.posts > 0) {
-                        infoFutures.add(executor.submit(new UserInfoTask(user)));
-                    }
-                }
-            } catch (Exception e) {
-                log.error("caught exc in UserListPageTask", e);
-            }
+        final FluentIterable<UserInfo> sympathies = FluentIterable
+                .from(
+                        Iterables.concat(
+                                FluentIterable
+                                        .from(infoFutures)
+                                        .transform(MoreGuava.<List<UserInfo>>unwrapFuture())
+                                        .filter(notNull())
+                        ))
+                .filter(new HasSympathy());
+
+
+        for (UserInfo sympathy : sympathies) {
+            log.warn("yay! {} !", sympathy.name);
         }
+
         executor.shutdown();
-        executor.awaitTermination(1, TimeUnit.DAYS);
-        log.info("executor done");
-
-        for (Future<UserInfo> future : infoFutures) {
-            try {
-                final UserInfo user = future.get();
-                if (user.sympathy) {
-                    log.warn("yay! {} !", user.name);
-                }
-            } catch (Exception e) {
-                log.error("caught exc in UserInfoTask", e);
-            }
-        }
+        log.info("done");
     }
 
     private static final UserListPageParser userListPageParser = new RegexpUserListPageParser();
@@ -85,24 +93,30 @@ public class SympathiesFinderMain {
     }
 
     private final static UserInfoPageParser userInfoPageParser = new ContainsUserInfoPageParser();
-    private static class UserInfoTask implements Callable<UserInfo> {
-        private final User user;
-
-        public UserInfoTask(User user) {
-            this.user = user;
-        }
-
+    private static class UserInfoFunction implements Function<List<User>, List<UserInfo>> {
         @Override
-        public UserInfo call() throws Exception {
-            try {
+        public List<UserInfo> apply(java.util.List<User> input) {
                 final FlocalClient flocal = threadLocal.get();
-                final String page = flocal.getPage("/showprofile.php?Cat=&User=" + URLEncoder.encode(user.name, "windows-1251"));
-                return userInfoPageParser.parse(user, page);
-            } finally {
-                final int curCount = doneCount.incrementAndGet();
-                System.out.print("u" + curCount + "\r");
-            }
+                final ArrayList<UserInfo> userInfos = Lists.newArrayList();
+                for (User user : input) {
+                    try {
+                        final String page = flocal.getPage("/showprofile.php?Cat=&User=" + URLEncoder.encode(user.name, "windows-1251"));
+                        userInfos.add(userInfoPageParser.parse(user, page));
+                    } catch (Exception e) {
+                        log.error("error getting userinfo for "+user.name, e);
+                    } finally {
+                        final int curCount = doneCount.incrementAndGet();
+                        System.out.print("u" + curCount + "\r");
+                    }
+                }
+                return userInfos;
         }
+    }
 
+    private static class HasSympathy implements Predicate<UserInfo> {
+        @Override
+        public boolean apply(UserInfo input) {
+            return input.sympathy;
+        }
     }
 }

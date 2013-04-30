@@ -2,14 +2,12 @@ package ru.alepar.flocal.http;
 
 import com.google.common.collect.Lists;
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
-import org.apache.http.conn.params.ConnRoutePNames;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
 
@@ -36,8 +34,8 @@ public class ApacheHttpClient implements FlocalClient {
     public ApacheHttpClient() {
         try {
             httpclient = new DefaultHttpClient();
-            final HttpHost proxy = new HttpHost("surf-proxy.intranet.db.com", 8080);
-            httpclient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, proxy);
+//            final HttpHost proxy = new HttpHost("surf-proxy.intranet.db.com", 8080);
+//            httpclient.getParams().setParameter(ConnRoutePNames.DEFAULT_PROXY, proxy);
 
             try(CloseableRequest<HttpPost> loginPost = new CloseableRequest<>(new HttpPost(ROOT_URL + "/start_page.php"))) {
                 final List<NameValuePair> nvps = Lists.newArrayList();
