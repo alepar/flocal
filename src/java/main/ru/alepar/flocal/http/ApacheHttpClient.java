@@ -21,7 +21,7 @@ import java.net.HttpURLConnection;
 import java.util.List;
 import java.util.ResourceBundle;
 
-public class ApacheHttpClient implements HttpClient {
+public class ApacheHttpClient implements FlocalClient {
 
     private static final String ROOT_URL = "http://forumlocal.ru";
     private static final String username, password;

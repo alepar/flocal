@@ -7,10 +7,10 @@ import static org.junit.Assert.*;
 
 public class HttpClientTest {
 
-    private final HttpClient httpClient = HttpClient.Factory.create();
+    private final FlocalClient flocal = FlocalClient.Factory.create();
 
     @Test
     public void returnsPageAsLoggedInUser() throws Exception {
-        assertThat(httpClient.getPage("/ubbthreads.php"), containsString("/logout.php"));
+        assertThat(flocal.getPage("/ubbthreads.php"), containsString("/logout.php"));
     }
 }
