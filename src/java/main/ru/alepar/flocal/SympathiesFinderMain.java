@@ -21,7 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static ru.alepar.flocal.MoreGuava.notNull;
+import static com.google.common.base.Predicates.notNull;
 
 public class SympathiesFinderMain {
 
